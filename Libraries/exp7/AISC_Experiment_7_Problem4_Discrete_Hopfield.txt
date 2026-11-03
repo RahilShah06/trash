@@ -1,0 +1,54 @@
+# EXPERIMENT 7 - PROBLEM 4
+# AUTO ASSOCIATIVE DISCRETE HOPFIELD NETWORK
+
+import numpy as np
+
+# Stored pattern in bipolar and binary form
+s_bipolar = np.array([1, 1, 1, -1])
+s_binary = np.array([1, 1, 1, 0])
+
+# Hebbian weight matrix; remove self-connections
+W = np.outer(s_bipolar, s_bipolar)
+np.fill_diagonal(W, 0)
+
+print("STORED VECTOR (BINARY):", s_binary)
+print("WEIGHT MATRIX W:")
+print(W)
+
+# Binary activation: 1 for positive net input, 0 otherwise
+def step(net):
+    return 1 if net > 0 else 0
+
+# Test input: first and second components are missing
+x = np.array([0, 0, 1, 0])
+y = x.copy()
+
+# Asynchronous update order: y1, y4, y3, y2
+order = [0, 3, 2, 1]
+
+epoch = 0
+print("\nTEST INPUT:", x)
+
+while True:
+    epoch += 1
+    previous = y.copy()
+
+    print("\n--- EPOCH", epoch, "---")
+
+    for i in order:
+        # Net input for unit i; updated y values are used immediately
+        net = x[i] + y @ W[:, i]
+        y[i] = step(net)
+
+        print("Update y", i + 1, ": net =", net, "-> y =", y)
+
+    if np.array_equal(y, previous):
+        print("No change in this epoch -> network has converged.")
+        break
+
+    print("States changed, running another epoch.")
+
+print("\nRECALLED VECTOR:", y)
+print("STORED VECTOR  :", s_binary)
+print("RESULT:", "Pattern recalled correctly"
+      if np.array_equal(y, s_binary) else "Pattern not recalled")

@@ -1,0 +1,59 @@
+# EXPERIMENT 7 - PROBLEM 2
+# HETERO ASSOCIATIVE MEMORY USING HEBBIAN LEARNING
+
+import numpy as np
+
+# Four training input vectors (binary)
+S = np.array([
+    [1, 0, 0, 0],
+    [1, 1, 0, 0],
+    [0, 0, 0, 1],
+    [0, 0, 1, 1]
+])
+
+# Corresponding target vectors (binary)
+T = np.array([
+    [0, 1],
+    [0, 1],
+    [1, 0],
+    [1, 0]
+])
+
+print("INPUT VECTORS S:")
+print(S)
+print("\nTARGET VECTORS T:")
+print(T)
+
+# Hebbian rule: add outer product of each input-target pair
+W = np.zeros((S.shape[1], T.shape[1]), dtype=int)
+
+for p, (s, t) in enumerate(zip(S, T), start=1):
+    dW = np.outer(s, t)
+    W += dW
+
+    print("\nWEIGHT CHANGE FOR PAIR", p)
+    print(dW)
+
+print("\nFINAL WEIGHT MATRIX W:")
+print(W)
+print("Check W = S transpose @ T:", np.array_equal(W, S.T @ T))
+
+# Binary activation: 1 for positive net input, 0 otherwise
+def binary_step(net):
+    return (net > 0).astype(int)
+
+print("\nRECALL USING TRAINING INPUTS")
+correct = 0
+
+for p, (s, t) in enumerate(zip(S, T), start=1):
+    net = s @ W
+    output = binary_step(net)
+    match = np.array_equal(output, t)
+    correct += int(match)
+
+    print("\nPair", p, "Input:", s)
+    print("Net Input:", net)
+    print("Output:", output, "Target:", t,
+          "->", "MATCH" if match else "MISMATCH")
+
+print("\nCorrectly recalled", correct, "/", len(S), "pairs")

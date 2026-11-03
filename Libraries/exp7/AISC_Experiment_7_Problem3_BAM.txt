@@ -1,0 +1,68 @@
+# EXPERIMENT 7 - PROBLEM 3
+# BIDIRECTIONAL ASSOCIATIVE MEMORY (BAM)
+
+import numpy as np
+
+# 5 x 3 letters: '*' represents +1 and '.' represents -1
+letters = {
+    "E": ["***", "*..", "***", "*..", "***"],
+    "F": ["***", "***", "*..", "*..", "*.."]
+}
+
+# Bipolar target codes for the two letters
+targets = {
+    "E": np.array([-1, 1]),
+    "F": np.array([1, 1])
+}
+
+# Convert the 5 x 3 pattern into a 15-element bipolar vector
+def encode(rows):
+    return np.array([
+        1 if char == "*" else -1
+        for row in rows
+        for char in row
+    ])
+
+# Display a 15-element vector as a 5 x 3 letter
+def show(vector):
+    for row in vector.reshape(5, 3):
+        print(" ", " ".join("*" if value == 1 else "." for value in row))
+
+X = {name: encode(pattern) for name, pattern in letters.items()}
+
+# BAM Hebbian weights: W = sum of outer products x transpose y
+W = sum(np.outer(X[name], targets[name]) for name in X)
+
+print("WEIGHT MATRIX W (15 x 2):")
+print(W)
+
+# Bipolar sign activation
+def sign(net):
+    return np.where(net >= 0, 1, -1)
+
+# Recall each stored letter in both directions
+for name in X:
+    x = X[name]
+    target = targets[name]
+
+    print("\n========== LETTER", name, "==========")
+    print("Input pattern:")
+    show(x)
+
+    # Forward recall: X layer to Y layer
+    y_net = x @ W
+    y = sign(y_net)
+
+    print("Forward net input:", y_net)
+    print("Output Y:", y, "Target:", target,
+          "->", "OK" if np.array_equal(y, target) else "WRONG")
+
+    # Backward recall: Y layer to X layer using transpose weights
+    x_net = y @ W.T
+    x_back = sign(x_net)
+
+    print("Backward net input:", x_net)
+    print("Recalled pattern (Y -> X):")
+    show(x_back)
+    print("Backward recall:",
+          "OK" if np.array_equal(x_back, x) else "WRONG")

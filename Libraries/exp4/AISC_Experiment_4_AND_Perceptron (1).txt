@@ -1,0 +1,133 @@
+# EXPERIMENT 4 - AND GATE USING PERCEPTRON
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Bipolar input patterns and target outputs
+X = np.array([
+    [1, 1],
+    [1, -1],
+    [-1, 1],
+    [-1, -1]
+])
+t = np.array([1, -1, -1, -1])
+
+# Initial weights, bias and learning rate
+w1 = 0
+w2 = 0
+b = 0
+alpha = 1
+
+# Bipolar step activation function
+def activation(yin):
+    if yin == 0:
+        return 0
+    elif yin > 0:
+        return 1
+    else:
+        return -1
+
+# Store training details
+records = []
+epoch = 1
+
+while True:
+    errors_in_epoch = 0
+
+    for x, target in zip(X, t):
+        x1, x2 = x
+        yin = b + w1 * x1 + w2 * x2
+        y = activation(yin)
+
+        old_w1, old_w2, old_b = w1, w2, b
+
+        if y != target:
+            dw1 = alpha * target * x1
+            dw2 = alpha * target * x2
+            db = alpha * target
+
+            w1 = w1 + dw1
+            w2 = w2 + dw2
+            b = b + db
+            errors_in_epoch += 1
+        else:
+            dw1 = 0
+            dw2 = 0
+            db = 0
+
+        records.append([
+            epoch, x1, x2, target, alpha, yin, y,
+            old_w1, old_w2, old_b,
+            dw1, dw2, db, w1, w2, b
+        ])
+
+    if errors_in_epoch == 0:
+        break
+
+    epoch += 1
+
+# Training table
+results = pd.DataFrame(records, columns=[
+    "Epoch", "X1", "X2", "Target", "Alpha", "YIN", "Predicted Y",
+    "W1 Before", "W2 Before", "Bias Before",
+    "Delta W1", "Delta W2", "Delta Bias",
+    "W1 New", "W2 New", "Bias New"
+])
+
+# Final truth table
+truth_table = pd.DataFrame({
+    "X1": X[:, 0],
+    "X2": X[:, 1],
+    "Target": t
+})
+truth_table["YIN"] = b + w1 * truth_table["X1"] + w2 * truth_table["X2"]
+truth_table["Predicted Y"] = truth_table["YIN"].apply(activation)
+truth_table["Correct?"] = truth_table["Target"] == truth_table["Predicted Y"]
+
+print("\n" + "=" * 72)
+print("                 AND GATE USING PERCEPTRON")
+print("=" * 72)
+print("\nFINAL TRUTH TABLE")
+print(truth_table.to_string(index=False))
+
+print("\nPERCEPTRON TRAINING TABLE")
+print(results.to_string(index=False))
+
+print("\nFINAL WEIGHTS")
+print("W1 =", w1)
+print("W2 =", w2)
+print("Bias =", b)
+print("Learning rate (alpha) =", alpha)
+print("Converged in", epoch, "epochs")
+
+# Plot the linear decision boundary
+x_line = np.linspace(-1.5, 1.5, 200)
+y_line = -(w1 * x_line + b) / w2
+
+positive = truth_table["Target"] == 1
+negative = truth_table["Target"] == -1
+
+plt.figure(figsize=(8, 6))
+plt.scatter(truth_table.loc[positive, "X1"], truth_table.loc[positive, "X2"],
+            s=180, marker="o", label="AND output = 1")
+plt.scatter(truth_table.loc[negative, "X1"], truth_table.loc[negative, "X2"],
+            s=180, marker="x", linewidths=3, label="AND output = -1")
+plt.plot(x_line, y_line, linewidth=2, label="Decision boundary")
+
+for _, row in truth_table.iterrows():
+    plt.annotate(
+        f"({int(row.X1)}, {int(row.X2)}) -> {int(row['Target'])}",
+        (row.X1, row.X2), xytext=(8, 8), textcoords="offset points"
+    )
+
+plt.axhline(0, linewidth=0.8)
+plt.axvline(0, linewidth=0.8)
+plt.xlim(-1.5, 1.5)
+plt.ylim(-1.5, 1.5)
+plt.xlabel("X1")
+plt.ylabel("X2")
+plt.title("AND Gate - Perceptron and Linear Separability")
+plt.grid(True, linestyle="--", alpha=0.5)
+plt.legend()
+plt.tight_layout()
+plt.show()

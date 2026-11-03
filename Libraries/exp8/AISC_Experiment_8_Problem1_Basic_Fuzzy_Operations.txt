@@ -1,0 +1,29 @@
+# EXPERIMENT 8 - PROBLEM 1
+# BASIC FUZZY SET OPERATIONS
+
+import numpy as np
+
+Plane = np.asarray([0.2, 0.5, 0.3, 0.8, 0.1])
+Train = np.asarray([1.0, 0.2, 0.4, 0.5, 0.2])
+
+print("Plane:", Plane)
+print("Train:", Train)
+
+print("\na) Union:", np.maximum(Plane, Train))
+print("b) Intersection:", np.minimum(Plane, Train))
+print("c) Complement of Plane:", 1 - Plane)
+print("d) Complement of Train:", 1 - Train)
+print("e) Plane intersection Complement of Train:",
+      np.minimum(Plane, 1 - Train))
+print("f) Complement of Union:",
+      1 - np.maximum(Plane, Train))
+print("g) Complement of Intersection:",
+      1 - np.minimum(Plane, Train))
+print("h) Maximum of Plane and its Complement:",
+      np.maximum(Plane, 1 - Plane))
+print("i) Minimum of Plane and its Complement:",
+      np.minimum(Plane, 1 - Plane))
+print("j) Maximum of Train and its Complement:",
+      np.maximum(Train, 1 - Train))
+print("k) Minimum of Train and its Complement:",
+      np.minimum(Train, 1 - Train))

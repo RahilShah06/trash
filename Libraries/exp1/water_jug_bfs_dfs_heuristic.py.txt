@@ -1,0 +1,100 @@
+cap1 = int(input("Enter capacity of Jug 1: "))
+cap2 = int(input("Enter capacity of Jug 2: "))
+target = int(input("Enter target amount: "))
+
+def moves(state):
+    x, y = state
+    p = min(x, cap2 - y)
+    q = min(y, cap1 - x)
+    return [
+        ((cap1, y), "Fill Jug 1"),
+        ((x, cap2), "Fill Jug 2"),
+        ((0, y), "Empty Jug 1"),
+        ((x, 0), "Empty Jug 2"),
+        ((x-p, y+p), "Pour Jug 1 -> Jug 2"),
+        ((x+q, y-q), "Pour Jug 2 -> Jug 1")
+    ]
+
+def show(path):
+    if not path:
+        print("No solution found")
+        return
+    print("\nInitial State:", path[0][0])
+    for i in range(1, len(path)):
+        print(i, path[i][1], path[i-1][0], "->", path[i][0])
+    print("Goal Reached:", path[-1][0])
+
+# BFS
+def bfs():
+    queue = [((0, 0), [((0, 0), "Start")])]
+    visited = [(0, 0)]
+    while queue:
+        state, path = queue.pop(0)
+        if state[1] == target:
+            return path
+        for s, op in moves(state):
+            if s not in visited:
+                visited.append(s)
+                queue.append((s, path + [(s, op)]))
+    return None
+
+# DFS
+def dfs():
+    visited = []
+    path = []
+    def search(state, op):
+        if state in visited:
+            return False
+        visited.append(state)
+        path.append((state, op))
+        if state[1] == target:
+            return True
+        for s, operation in moves(state):
+            if search(s, operation):
+                return True
+        path.pop()
+        return False
+    if search((0, 0), "Start"):
+        return path
+    return None
+
+# HEURISTIC SEARCH
+def heuristic(state):
+    return abs(target - state[1])
+
+def heuristic_search():
+    start = (0, 0)
+    queue = []
+    queue.append((heuristic(start), start, [(start, "Start")]))
+    visited = [start]
+    while queue:
+        best = 0
+        for i in range(1, len(queue)):
+            if queue[i][0] < queue[best][0]:
+                best = i
+        h, state, path = queue.pop(best)
+        if state[1] == target:
+            return path
+        for s, op in moves(state):
+            if s not in visited:
+                visited.append(s)
+                queue.append((heuristic(s), s, path + [(s, op)]))
+    return None
+
+# MAIN PROGRAM
+if target < 0 or target > cap2:
+    print("Invalid target")
+else:
+    print("\n1. BFS")
+    print("2. DFS")
+    print("3. Heuristic Search")
+
+    ch = input("Enter choice: ")
+    if ch == "1":
+        show(bfs())
+    elif ch == "2":
+        show(dfs())
+    elif ch == "3":
+        show(heuristic_search())
+    else:
+        print("Invalid choice")

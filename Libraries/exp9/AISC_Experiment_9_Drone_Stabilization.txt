@@ -1,0 +1,143 @@
+# PROGRAM 4 - FUZZY CONTROLLER FOR AUTONOMOUS DRONE STABILIZATION
+# Two independent fuzzy controllers are used:
+# 1. Roll angle error + roll angular rate -> roll correction
+# 2. Pitch angle error + pitch angular rate -> pitch correction
+
+import numpy as np
+import skfuzzy as fuzz
+from skfuzzy import control as ctrl
+import matplotlib.pyplot as plt
+
+# 1. COMMON FUZZY CONTROLLER FOR ONE DRONE AXIS
+def create_axis_controller(error_name, rate_name, output_name):
+
+    angle_error = ctrl.Antecedent(
+        np.arange(-30, 31, 1), error_name
+    )
+
+    angular_rate = ctrl.Antecedent(
+        np.arange(-100, 101, 1), rate_name
+    )
+
+    motor_correction = ctrl.Consequent(
+        np.arange(-100, 101, 1), output_name
+    )
+
+    # Angle error membership functions
+    angle_error['NB'] = fuzz.trimf(angle_error.universe, [-30, -30, -10])
+    angle_error['NS'] = fuzz.trimf(angle_error.universe, [-30, -15, 0])
+    angle_error['Z'] = fuzz.trimf(angle_error.universe, [-8, 0, 8])
+    angle_error['PS'] = fuzz.trimf(angle_error.universe, [0, 15, 30])
+    angle_error['PB'] = fuzz.trimf(angle_error.universe, [10, 30, 30])
+
+    # Angular rate membership functions
+    angular_rate['NB'] = fuzz.trimf(angular_rate.universe, [-100, -100, -30])
+    angular_rate['NS'] = fuzz.trimf(angular_rate.universe, [-100, -50, 0])
+    angular_rate['Z'] = fuzz.trimf(angular_rate.universe, [-20, 0, 20])
+    angular_rate['PS'] = fuzz.trimf(angular_rate.universe, [0, 50, 100])
+    angular_rate['PB'] = fuzz.trimf(angular_rate.universe, [30, 100, 100])
+
+    # Signed motor correction membership functions
+    motor_correction['NB'] = fuzz.trimf(motor_correction.universe, [-100, -100, -40])
+    motor_correction['NS'] = fuzz.trimf(motor_correction.universe, [-100, -50, 0])
+    motor_correction['Z'] = fuzz.trimf(motor_correction.universe, [-20, 0, 20])
+    motor_correction['PS'] = fuzz.trimf(motor_correction.universe, [0, 50, 100])
+    motor_correction['PB'] = fuzz.trimf(motor_correction.universe, [40, 100, 100])
+
+    # Rule table: rows = angle error; columns = angular rate
+    # NB = Negative Big, NS = Negative Small, Z = Zero,
+    # PS = Positive Small, PB = Positive Big
+    error_terms = ['NB', 'NS', 'Z', 'PS', 'PB']
+    rate_terms = ['NB', 'NS', 'Z', 'PS', 'PB']
+
+    rule_table = [
+        ['Z',  'NS', 'NB', 'NB', 'NB'],
+        ['PS', 'Z',  'NS', 'NB', 'NB'],
+        ['PB', 'PS', 'Z',  'NS', 'NB'],
+        ['PB', 'PB', 'PS', 'Z',  'NS'],
+        ['PB', 'PB', 'PB', 'PS', 'Z']
+    ]
+
+    rules = []
+
+    for i, e in enumerate(error_terms):
+        for j, r in enumerate(rate_terms):
+            rules.append(
+                ctrl.Rule(
+                    angle_error[e] & angular_rate[r],
+                    motor_correction[rule_table[i][j]]
+                )
+            )
+
+    control_system = ctrl.ControlSystem(rules)
+    simulation = ctrl.ControlSystemSimulation(control_system)
+
+    return angle_error, angular_rate, motor_correction, simulation
+
+
+# 2. CREATE ROLL AND PITCH CONTROLLERS
+roll_error_mf, roll_rate_mf, roll_output_mf, roll_sim = create_axis_controller(
+    'roll_error', 'roll_rate', 'roll_correction'
+)
+
+pitch_error_mf, pitch_rate_mf, pitch_output_mf, pitch_sim = create_axis_controller(
+    'pitch_error', 'pitch_rate', 'pitch_correction'
+)
+
+# 3. GIVE DRONE INPUT VALUES (change these to test other cases)
+target_roll = 0
+actual_roll = 12
+roll_rate = 5
+
+target_pitch = 0
+actual_pitch = -7
+pitch_rate = -2
+
+# Calculate angle errors
+roll_error = target_roll - actual_roll
+pitch_error = target_pitch - actual_pitch
+
+# 4. SET ROLL INPUTS AND COMPUTE
+roll_sim.input['roll_error'] = roll_error
+roll_sim.input['roll_rate'] = roll_rate
+roll_sim.compute()
+roll_result = roll_sim.output['roll_correction']
+
+# 5. SET PITCH INPUTS AND COMPUTE
+pitch_sim.input['pitch_error'] = pitch_error
+pitch_sim.input['pitch_rate'] = pitch_rate
+pitch_sim.compute()
+pitch_result = pitch_sim.output['pitch_correction']
+
+# 6. DISPLAY RESULTS
+print('\nAUTONOMOUS DRONE STABILIZATION')
+print('\nROLL AXIS')
+print('Target Roll:', target_roll, 'degree')
+print('Actual Roll:', actual_roll, 'degree')
+print('Roll Error:', roll_error, 'degree')
+print('Roll Rate:', roll_rate, 'degree/second')
+print('Roll Motor Correction:', round(roll_result, 2), '%')
+
+print('\nPITCH AXIS')
+print('Target Pitch:', target_pitch, 'degree')
+print('Actual Pitch:', actual_pitch, 'degree')
+print('Pitch Error:', pitch_error, 'degree')
+print('Pitch Rate:', pitch_rate, 'degree/second')
+print('Pitch Motor Correction:', round(pitch_result, 2), '%')
+
+# 7. DISPLAY MEMBERSHIP FUNCTIONS AND OUTPUTS
+roll_error_mf.view()
+roll_rate_mf.view()
+roll_output_mf.view(sim=roll_sim)
+plt.show()
+
+pitch_error_mf.view()
+pitch_rate_mf.view()
+pitch_output_mf.view(sim=pitch_sim)
+plt.show()
+
+print('\nDrone Stabilization Controller Executed Successfully!')
+
+# SAFETY NOTE: These outputs are illustrative signed control corrections.
+# A real drone requires validated dynamics, motor mixing, sensor filtering,
+# actuator limits, failsafes and hardware-in-the-loop testing.

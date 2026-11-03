@@ -1,0 +1,308 @@
+# Experiment 3
+# Logic Gates, Half Adder and Full Adder using McCulloch-Pitts Neurons
+
+# --------------------------------------------------
+# COMMON MCP NEURON AND DECISION BOUNDARY FUNCTIONS
+# --------------------------------------------------
+
+def mcp_neuron(x1, x2, w1, w2, bias, threshold):
+    total = w1 * x1 + w2 * x2 + bias
+    return 1 if total >= threshold else 0
+
+
+def get_boundary(w1, w2, bias, threshold):
+    slope = -w1 / w2
+    intercept = (threshold - bias) / w2
+    return slope, intercept
+
+
+# --------------------------------------------------
+# 1. BASIC LOGIC GATES USING MCP NEURONS
+# --------------------------------------------------
+
+logic_neurons = {
+    "AND": (1, 1, 0, 2),
+    "OR": (1, 1, 0, 1),
+    "NAND": (-1, -1, 1, 0),
+    "NOR": (-1, -1, 0, 0),
+    "XOR_Z1": (1, -1, 0, 1),
+    "XOR_Z2": (-1, 1, 0, 1),
+    "XOR_OR": (1, 1, 0, 1),
+    "XNOR_Z1": (1, 1, 0, 2),
+    "XNOR_Z2": (-1, -1, 0, 0),
+    "XNOR_OR": (1, 1, 0, 1)
+}
+
+print("\n========== LOGIC GATES USING MCP NEURONS ==========")
+
+print("\nDecision Boundary Equations")
+print("General form : W1X1 + W2X2 + C = theta")
+print("Boundary     : X2 = mX1 + b")
+
+for name, values in logic_neurons.items():
+    w1, w2, bias, threshold = values
+    slope, intercept = get_boundary(w1, w2, bias, threshold)
+
+    print("\n", name)
+    print("Slope =", slope)
+    print("Intercept =", intercept)
+    print("X2 =", slope, "X1 + (", intercept, ")")
+
+
+print("\n\nLOGIC GATE TRUTH TABLE")
+print("A B | AND OR NAND NOR XOR XNOR")
+
+for a in (0, 1):
+    for b in (0, 1):
+        and_output = mcp_neuron(a, b, 1, 1, 0, 2)
+        or_output = mcp_neuron(a, b, 1, 1, 0, 1)
+        nand_output = mcp_neuron(a, b, -1, -1, 1, 0)
+        nor_output = mcp_neuron(a, b, -1, -1, 0, 0)
+
+        # XOR uses two intermediate neurons and one OR neuron
+        xor_z1 = mcp_neuron(a, b, 1, -1, 0, 1)
+        xor_z2 = mcp_neuron(a, b, -1, 1, 0, 1)
+        xor_output = mcp_neuron(xor_z1, xor_z2, 1, 1, 0, 1)
+
+        # XNOR uses two intermediate neurons and one OR neuron
+        xnor_z1 = mcp_neuron(a, b, 1, 1, 0, 2)
+        xnor_z2 = mcp_neuron(a, b, -1, -1, 0, 0)
+        xnor_output = mcp_neuron(xnor_z1, xnor_z2, 1, 1, 0, 1)
+
+        print(a, b, "|", and_output, or_output, nand_output,
+              nor_output, xor_output, xnor_output)
+
+
+# --------------------------------------------------
+# 2. HALF ADDER USING MCP NEURONS
+# --------------------------------------------------
+
+print("\n========== HALF ADDER ==========")
+
+half_neurons = {
+    "Z1": (1, -1, 0, 1),
+    "Z2": (-1, 1, 0, 1),
+    "SUM": (1, 1, 0, 1),
+    "CARRY": (1, 1, 0, 2)
+}
+
+print("\nDecision Boundary Equations")
+print("General form : W1X1 + W2X2 + C = theta")
+print("Boundary     : X2 = mX1 + b")
+
+for name, values in half_neurons.items():
+    w1, w2, bias, threshold = values
+    slope, intercept = get_boundary(w1, w2, bias, threshold)
+
+    print("\n", name)
+    print("Slope =", slope)
+    print("Intercept =", intercept)
+    print("X2 =", slope, "X1 + (", intercept, ")")
+
+
+# Calculate intermediate XOR neurons
+z1_result = {}
+z2_result = {}
+
+print("\nZ1 = X1 * X2'")
+
+for x1 in (0, 1):
+    for x2 in (0, 1):
+        output = mcp_neuron(x1, x2, 1, -1, 0, 1)
+        z1_result[(x1, x2)] = output
+        print("X1 =", x1, "X2 =", x2,
+              "Y =", x1 - x2, "Z1 =", output)
+
+
+print("\nZ2 = X1' * X2")
+
+for x1 in (0, 1):
+    for x2 in (0, 1):
+        output = mcp_neuron(x1, x2, -1, 1, 0, 1)
+        z2_result[(x1, x2)] = output
+        print("X1 =", x1, "X2 =", x2,
+              "Y =", -x1 + x2, "Z2 =", output)
+
+
+# SUM = Z1 OR Z2
+print("\nSUM = Z1 + Z2")
+
+for x1 in (0, 1):
+    for x2 in (0, 1):
+        z1 = z1_result[(x1, x2)]
+        z2 = z2_result[(x1, x2)]
+        summation = z1 + z2
+        result = 1 if summation >= 1 else 0
+
+        print(x1, x2, "| Z1 =", z1, "Z2 =", z2,
+              "| Y =", summation, "| SUM =", result)
+
+
+# CARRY = X1 AND X2
+print("\nCARRY = X1 * X2")
+
+for x1 in (0, 1):
+    for x2 in (0, 1):
+        total = x1 + x2
+        carry = 1 if total >= 2 else 0
+
+        print(x1, x2, "| Y =", total, "| CARRY =", carry)
+
+
+# Final Half Adder Truth Table
+print("\n========== HALF ADDER RESULT ==========")
+print("X1 X2 | SUM CARRY")
+
+for x1 in (0, 1):
+    for x2 in (0, 1):
+        z1 = z1_result[(x1, x2)]
+        z2 = z2_result[(x1, x2)]
+
+        summation = z1 + z2
+        sum_output = 1 if summation >= 1 else 0
+
+        carry_value = x1 + x2
+        carry_output = 1 if carry_value >= 2 else 0
+
+        print(x1, x2, "|", sum_output, "   ", carry_output)
+
+
+# --------------------------------------------------
+# 3. FULL ADDER USING MCP NEURONS
+# --------------------------------------------------
+
+def activate(value, threshold):
+    return 1 if value >= threshold else 0
+
+
+def xor_mcp(a, b):
+    # First intermediate neuron: A * B'
+    first = activate(a - b, 1)
+
+    # Second intermediate neuron: A' * B
+    second = activate(-a + b, 1)
+
+    # OR operation
+    return activate(first + second, 1)
+
+
+def and_mcp(a, b):
+    return activate(a + b, 2)
+
+
+def or_mcp(a, b):
+    return activate(a + b, 1)
+
+
+print("\n========== FULL ADDER ==========")
+
+# Decision boundary information
+full_neurons = {
+    "Z1": (1, -1, 0, 1),
+    "Z2": (-1, 1, 0, 1),
+    "S1": (1, 1, 0, 1),
+    "C1": (1, 1, 0, 2),
+    "Z3": (1, -1, 0, 1),
+    "Z4": (-1, 1, 0, 1),
+    "SUM": (1, 1, 0, 1),
+    "C2": (1, 1, 0, 2),
+    "CARRY": (1, 1, 0, 1)
+}
+
+print("\nDecision Boundary Equations")
+print("General form : W1X1 + W2X2 + C = theta")
+print("Boundary     : X2 = mX1 + b")
+
+for neuron, values in full_neurons.items():
+    w1, w2, bias, threshold = values
+    slope, intercept = get_boundary(w1, w2, bias, threshold)
+
+    print("\n", neuron)
+    print("Slope =", slope)
+    print("Intercept =", intercept)
+    print("X2 =", slope, "X1 + (", intercept, ")")
+
+
+# Store intermediate values
+s1_values = {}
+c1_values = {}
+
+# Step 1: S1 = X1 XOR X2
+print("\nS1 = X1 XOR X2")
+
+for x1 in (0, 1):
+    for x2 in (0, 1):
+        s1 = xor_mcp(x1, x2)
+        c1 = and_mcp(x1, x2)
+
+        s1_values[(x1, x2)] = s1
+        c1_values[(x1, x2)] = c1
+
+        print("X1 =", x1, "X2 =", x2,
+              "| S1 =", s1, "| C1 =", c1)
+
+
+# Step 2: SUM = S1 XOR Cin
+print("\nSUM = S1 XOR Cin")
+
+sum_values = {}
+
+for x1 in (0, 1):
+    for x2 in (0, 1):
+        s1 = s1_values[(x1, x2)]
+
+        for cin in (0, 1):
+            final_sum = xor_mcp(s1, cin)
+            sum_values[(x1, x2, cin)] = final_sum
+
+            print("S1 =", s1, "Cin =", cin,
+                  "| SUM =", final_sum)
+
+
+# Step 3: C2 = S1 AND Cin
+print("\nC2 = S1 * Cin")
+
+c2_values = {}
+
+for x1 in (0, 1):
+    for x2 in (0, 1):
+        s1 = s1_values[(x1, x2)]
+
+        for cin in (0, 1):
+            c2 = and_mcp(s1, cin)
+            c2_values[(x1, x2, cin)] = c2
+
+            print("S1 =", s1, "Cin =", cin,
+                  "| C2 =", c2)
+
+
+# Step 4: CARRY = C1 OR C2
+print("\nCARRY = C1 + C2")
+
+carry_values = {}
+
+for x1 in (0, 1):
+    for x2 in (0, 1):
+        c1 = c1_values[(x1, x2)]
+
+        for cin in (0, 1):
+            c2 = c2_values[(x1, x2, cin)]
+            carry = or_mcp(c1, c2)
+            carry_values[(x1, x2, cin)] = carry
+
+            print("X1 =", x1, "X2 =", x2, "Cin =", cin,
+                  "| C1 =", c1, "C2 =", c2,
+                  "| CARRY =", carry)
+
+
+# Final Full Adder Truth Table
+print("\n========== FULL ADDER RESULT ==========")
+print("X1 X2 Cin | SUM CARRY")
+
+for x1 in (0, 1):
+    for x2 in (0, 1):
+        for cin in (0, 1):
+            final_sum = sum_values[(x1, x2, cin)]
+            final_carry = carry_values[(x1, x2, cin)]
+
+            print(x1, x2, cin, "|", final_sum, "   ", final_carry)

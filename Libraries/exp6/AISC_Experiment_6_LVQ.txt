@@ -1,0 +1,112 @@
+# EXPERIMENT 6 - LEARNING VECTOR QUANTIZATION (LVQ)
+
+import numpy as np
+import pandas as pd
+
+# Initial Reference Vectors
+w1 = np.array([0, 0, 1, 1], dtype=float)
+w2 = np.array([1, 0, 0, 0], dtype=float)
+
+weights = np.array([w1, w2])
+weight_classes = np.array([1, 2])
+
+# Training Inputs
+X = np.array([
+    [0, 0, 0, 1],
+    [1, 1, 0, 0],
+    [0, 1, 1, 0]
+], dtype=float)
+
+# Target Classes
+T = np.array([2, 1, 1])
+
+alpha = 0.1
+
+print("INITIAL WEIGHTS")
+print(pd.DataFrame(
+    weights,
+    index=["W1 (Class 1)", "W2 (Class 2)"],
+    columns=["x1", "x2", "x3", "x4"]
+))
+
+# Training Loop
+for k in range(len(X)):
+    x = X[k]
+    target = T[k]
+
+    print("\n" + "=" * 45)
+    print("TRAINING VECTOR", k + 1)
+    print("Input =", x)
+    print("Target Class =", target)
+
+    distances = []
+    distance_rows = []
+
+    # Calculate squared Euclidean distance
+    for j in range(len(weights)):
+        components = (weights[j] - x) ** 2
+        distance = np.sum(components)
+        distances.append(distance)
+
+        distance_rows.append({
+            "Neuron": f"W{j+1}",
+            "Class": weight_classes[j],
+            "Distance": round(distance, 4)
+        })
+
+    distance_df = pd.DataFrame(distance_rows)
+
+    print("\nDISTANCE TABLE")
+    print(distance_df.to_string(index=False))
+
+    # Find the winning reference vector
+    winner = int(np.argmin(distances))
+
+    print("\nWinning Neuron = W" + str(winner + 1))
+    print("Winner Class =", weight_classes[winner])
+
+    old_weight = weights[winner].copy()
+
+    # Move winner towards input if correct, away if incorrect
+    if weight_classes[winner] == target:
+        print("Correct Classification")
+        print("W(new) = W(old) + alpha * (X - W(old))")
+        weights[winner] = (
+            weights[winner] + alpha * (x - weights[winner])
+        )
+    else:
+        print("Wrong Classification")
+        print("W(new) = W(old) - alpha * (X - W(old))")
+        weights[winner] = (
+            weights[winner] - alpha * (x - weights[winner])
+        )
+
+    update_rows = []
+
+    for i in range(len(x)):
+        update_rows.append({
+            "Weight": f"w{winner+1}{i+1}",
+            "Old Weight": round(old_weight[i], 4),
+            "Input": x[i],
+            "New Weight": round(weights[winner][i], 4)
+        })
+
+    update_df = pd.DataFrame(update_rows)
+
+    print("\nWEIGHT UPDATE TABLE")
+    print(update_df.to_string(index=False))
+
+    print("\nUPDATED WEIGHT MATRIX")
+    print(pd.DataFrame(
+        weights,
+        index=["W1 (Class 1)", "W2 (Class 2)"],
+        columns=["x1", "x2", "x3", "x4"]
+    ))
+
+print("\n" + "=" * 45)
+print("FINAL WEIGHTS")
+print(pd.DataFrame(
+    weights,
+    index=["W1 (Class 1)", "W2 (Class 2)"],
+    columns=["x1", "x2", "x3", "x4"]
+))

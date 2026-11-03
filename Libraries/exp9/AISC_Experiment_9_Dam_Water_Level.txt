@@ -1,0 +1,108 @@
+# PROGRAM 2 - FUZZY CONTROLLER FOR WATER LEVEL MANAGEMENT IN A DAM
+
+import numpy as np
+import skfuzzy as fuzz
+from skfuzzy import control as ctrl
+import matplotlib.pyplot as plt
+
+# 1. DEFINE INPUT AND OUTPUT VARIABLES
+# Water level: percentage of dam capacity (0-100)
+# Inflow rate: percentage of nominal inflow rate (0-100)
+# Gate opening: percentage (0 = closed, 100 = fully open)
+
+water_level = ctrl.Antecedent(np.arange(0, 101, 1), 'water_level')
+inflow_rate = ctrl.Antecedent(np.arange(0, 101, 1), 'inflow_rate')
+gate_opening = ctrl.Consequent(np.arange(0, 101, 1), 'gate_opening')
+
+# 2. WATER LEVEL MEMBERSHIP FUNCTIONS
+water_level['VeryLow'] = fuzz.trimf(water_level.universe, [0, 0, 25])
+water_level['Low'] = fuzz.trimf(water_level.universe, [10, 30, 50])
+water_level['Medium'] = fuzz.trimf(water_level.universe, [35, 55, 75])
+water_level['High'] = fuzz.trimf(water_level.universe, [60, 80, 95])
+water_level['VeryHigh'] = fuzz.trimf(water_level.universe, [85, 100, 100])
+
+# 3. INFLOW RATE MEMBERSHIP FUNCTIONS
+inflow_rate['Low'] = fuzz.trimf(inflow_rate.universe, [0, 0, 40])
+inflow_rate['Medium'] = fuzz.trimf(inflow_rate.universe, [20, 50, 80])
+inflow_rate['High'] = fuzz.trimf(inflow_rate.universe, [60, 100, 100])
+
+# 4. GATE OPENING MEMBERSHIP FUNCTIONS
+gate_opening['Closed'] = fuzz.trimf(gate_opening.universe, [0, 0, 15])
+gate_opening['Small'] = fuzz.trimf(gate_opening.universe, [5, 25, 45])
+gate_opening['Medium'] = fuzz.trimf(gate_opening.universe, [35, 50, 65])
+gate_opening['Large'] = fuzz.trimf(gate_opening.universe, [55, 75, 95])
+gate_opening['Full'] = fuzz.trimf(gate_opening.universe, [85, 100, 100])
+
+# 5. DISPLAY MEMBERSHIP FUNCTIONS
+water_level.view()
+inflow_rate.view()
+gate_opening.view()
+plt.show()
+
+# 6. DEFINE FUZZY RULES
+# Rows: water level VeryLow, Low, Medium, High, VeryHigh
+# Columns: inflow Low, Medium, High
+rules = [
+    # Very low water level
+    ctrl.Rule(water_level['VeryLow'] & inflow_rate['Low'], gate_opening['Closed']),
+    ctrl.Rule(water_level['VeryLow'] & inflow_rate['Medium'], gate_opening['Small']),
+    ctrl.Rule(water_level['VeryLow'] & inflow_rate['High'], gate_opening['Medium']),
+
+    # Low water level
+    ctrl.Rule(water_level['Low'] & inflow_rate['Low'], gate_opening['Closed']),
+    ctrl.Rule(water_level['Low'] & inflow_rate['Medium'], gate_opening['Small']),
+    ctrl.Rule(water_level['Low'] & inflow_rate['High'], gate_opening['Medium']),
+
+    # Medium water level
+    ctrl.Rule(water_level['Medium'] & inflow_rate['Low'], gate_opening['Small']),
+    ctrl.Rule(water_level['Medium'] & inflow_rate['Medium'], gate_opening['Medium']),
+    ctrl.Rule(water_level['Medium'] & inflow_rate['High'], gate_opening['Large']),
+
+    # High water level
+    ctrl.Rule(water_level['High'] & inflow_rate['Low'], gate_opening['Medium']),
+    ctrl.Rule(water_level['High'] & inflow_rate['Medium'], gate_opening['Large']),
+    ctrl.Rule(water_level['High'] & inflow_rate['High'], gate_opening['Full']),
+
+    # Very high water level
+    ctrl.Rule(water_level['VeryHigh'] & inflow_rate['Low'], gate_opening['Large']),
+    ctrl.Rule(water_level['VeryHigh'] & inflow_rate['Medium'], gate_opening['Full']),
+    ctrl.Rule(water_level['VeryHigh'] & inflow_rate['High'], gate_opening['Full'])
+]
+
+# 7. CREATE CONTROL SYSTEM
+dam_control = ctrl.ControlSystem(rules)
+simulation = ctrl.ControlSystemSimulation(dam_control)
+
+# 8. INPUT VALUES (change these values to test other cases)
+current_water_level = 82
+current_inflow_rate = 75
+
+simulation.input['water_level'] = current_water_level
+simulation.input['inflow_rate'] = current_inflow_rate
+
+# 9. COMPUTE OUTPUT
+simulation.compute()
+result = simulation.output['gate_opening']
+
+# 10. DISPLAY RESULT
+print('\nDAM WATER LEVEL MANAGEMENT')
+print('Water Level:', current_water_level, '%')
+print('Inflow Rate:', current_inflow_rate, '% of nominal rate')
+print('Required Gate Opening:', round(result, 2), '%')
+
+# 11. DISPLAY OUTPUT GRAPH
+gate_opening.view(sim=simulation)
+plt.axvline(result, color='red', linestyle='--',
+            label=f'Gate Opening = {result:.2f}%')
+plt.title('Dam Controller - Gate Opening')
+plt.xlabel('Gate Opening (%)')
+plt.ylabel('Membership Degree')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+print('\nDam Water Level Controller Executed Successfully!')
+
+# SAFETY NOTE: This is an academic fuzzy-control simulation, not a certified
+# dam-operation controller. Real dam control requires engineering constraints,
+# forecasts, safety interlocks and operator oversight.

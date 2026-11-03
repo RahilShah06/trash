@@ -1,0 +1,121 @@
+# 8 PUZZLE USING A* AND MANHATTAN DISTANCE
+
+start = [[1, 2, 3],
+         [0, 4, 6],
+         [7, 5, 8]]
+
+goal = [[1, 2, 3],
+        [4, 5, 6],
+        [7, 8, 0]]
+
+
+# Manhattan Distance
+
+def h(state):
+    total = 0
+
+    for i in range(3):
+        for j in range(3):
+            value = state[i][j]
+
+            if value != 0:
+                r = (value - 1) // 3
+                c = (value - 1) % 3
+                total += abs(i - r) + abs(j - c)
+
+    return total
+
+
+# Generate possible moves
+
+def moves(state):
+    for i in range(3):
+        for j in range(3):
+            if state[i][j] == 0:
+                r, c = i, j
+
+    result = []
+
+    directions = []
+
+    if r > 0:
+        directions.append((r - 1, c, "UP"))
+    if r < 2:
+        directions.append((r + 1, c, "DOWN"))
+    if c > 0:
+        directions.append((r, c - 1, "LEFT"))
+    if c < 2:
+        directions.append((r, c + 1, "RIGHT"))
+
+    for x, y, operation in directions:
+        new_state = [row[:] for row in state]
+        new_state[r][c], new_state[x][y] = new_state[x][y], new_state[r][c]
+        result.append((new_state, operation))
+
+    return result
+
+
+# A* Search
+
+def astar():
+    queue = [(h(start), 0, start, [("Initial State", start)])]
+    visited = []
+
+    while queue:
+        best = 0
+
+        for i in range(1, len(queue)):
+            if queue[i][0] < queue[best][0]:
+                best = i
+
+        f, g, state, path = queue.pop(best)
+
+        if state in visited:
+            continue
+
+        if state == goal:
+            return path
+
+        visited.append(state)
+
+        for new_state, operation in moves(state):
+            if new_state not in visited:
+                new_g = g + 1
+                new_f = new_g + h(new_state)
+                new_path = path + [(operation, new_state)]
+                queue.append((new_f, new_g, new_state, new_path))
+
+    return None
+
+
+# Print solution
+
+def show(path):
+    for step, item in enumerate(path):
+        operation, state = item
+
+        print("\nStep", step, "-", operation)
+
+        for row in state:
+            print(row)
+
+        g = step
+        print("h(n) =", h(state))
+        print("g(n) =", g)
+        print("f(n) =", g + h(state))
+
+
+# MAIN PROGRAM
+
+print("Initial State:")
+for row in start:
+    print(row)
+
+answer = astar()
+
+if answer:
+    print("\nSolution Path:")
+    show(answer)
+    print("\nGoal Reached!")
+else:
+    print("No solution found")

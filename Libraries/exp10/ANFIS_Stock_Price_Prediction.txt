@@ -1,0 +1,181 @@
+# LAB 10 - ANFIS CASE STUDY
+# First-order Sugeno ANFIS with Gaussian membership functions
+
+import numpy as np
+import matplotlib.pyplot as plt
+from itertools import product
+from sklearn.model_selection import train_test_split
+
+# CASE STUDY 2: STOCK PRICE PREDICTION
+# Inputs: Previous closing price, trading volume, market return
+# Output: Next-day closing price (regression)
+# Synthetic data only; this is NOT a real market forecast.
+
+rng = np.random.default_rng(20)
+N = 150
+
+previous_close = rng.uniform(100, 1000, N)
+volume = rng.integers(10000, 1000000, N)
+market_return = rng.normal(0, 0.02, N)
+
+volume_effect = (volume - 500000) / 500000 * 0.002
+random_change = rng.normal(0, 0.005, N)
+next_close = previous_close * (1 + 0.8 * market_return + volume_effect + random_change)
+
+X = np.column_stack((previous_close, volume, market_return))
+y = next_close
+
+feature_names = ["Previous Close", "Volume", "Market Return"]
+
+print("STOCK PRICE PREDICTION")
+# COMMON ANFIS MODEL - FIRST ORDER SUGENO
+
+def gaussian(x, mean, sigma):
+    return np.exp(-((x - mean) ** 2) / (2 * sigma ** 2))
+
+
+def train_anfis(X, y, feature_names, title, classification=False):
+    # Split data: 80% training and 20% testing
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42,
+        stratify=y if classification else None
+    )
+
+    # Normalize inputs using training data only
+    mean_x = X_train.mean(axis=0)
+    std_x = X_train.std(axis=0)
+    std_x[std_x == 0] = 1
+    X_train = (X_train - mean_x) / std_x
+    X_test = (X_test - mean_x) / std_x
+
+    # Scale regression output between 0 and 1
+    if classification:
+        y_train_scaled = y_train.astype(float)
+    else:
+        y_min = y_train.min()
+        y_max = y_train.max()
+        y_train_scaled = (y_train - y_min) / (y_max - y_min + 1e-9)
+
+    # Gaussian membership functions: Low and High
+    means = [-1.0, 1.0]
+    sigma = 1.0
+    n_inputs = X_train.shape[1]
+
+    # Generate all fuzzy rule combinations
+    rules = list(product([0, 1], repeat=n_inputs))
+    n_rules = len(rules)
+
+    # Consequent parameters for each rule
+    W = np.zeros((n_rules, n_inputs + 1))
+
+    def infer(x):
+        memberships = np.array([
+            [gaussian(x[i], m, sigma) for m in means]
+            for i in range(n_inputs)
+        ])
+
+        strength = np.array([
+            min(memberships[i, rule[i]] for i in range(n_inputs))
+            for rule in rules
+        ])
+
+        normalized = strength / (np.sum(strength) + 1e-9)
+        xb = np.append(x, 1)
+        rule_outputs = W @ xb
+        output = np.sum(normalized * rule_outputs)
+        return output, strength, xb
+
+    # Train consequent weights using gradient-style updates
+    learning_rate = 0.05
+    epochs = 100
+    rng = np.random.default_rng(0)
+    loss_history = []
+
+    for epoch in range(epochs):
+        total_error = 0
+
+        for i in rng.permutation(len(X_train)):
+            output, strength, xb = infer(X_train[i])
+            error = y_train_scaled[i] - output
+            normalized = strength / (np.sum(strength) + 1e-9)
+            W[:] += learning_rate * error * np.outer(normalized, xb)
+            total_error += error ** 2
+
+        loss_history.append(total_error / len(X_train))
+
+        if (epoch + 1) % 20 == 0:
+            print(f"Epoch {epoch + 1:3d} | Training MSE = {loss_history[-1]:.4f}")
+
+    # Test predictions
+    test_output = np.array([infer(x)[0] for x in X_test])
+
+    print("\n" + "=" * 55)
+    print(title)
+    print("=" * 55)
+    print("Total Samples      :", len(X))
+    print("Input Features     :", feature_names)
+    print("Training Samples   :", len(X_train))
+    print("Testing Samples    :", len(X_test))
+    print("Membership Function: Gaussian")
+    print("Membership Sets    : Low and High")
+    print("Number of Rules    :", n_rules)
+    print("Training Epochs    :", epochs)
+    print("Learning Rate      :", learning_rate)
+    print("Final Training MSE :", round(loss_history[-1], 4))
+
+    if classification:
+        predicted = (np.clip(test_output, 0, 1) >= 0.5).astype(int)
+        accuracy = np.mean(predicted == y_test) * 100
+
+        tn = np.sum((predicted == 0) & (y_test == 0))
+        fp = np.sum((predicted == 1) & (y_test == 0))
+        fn = np.sum((predicted == 0) & (y_test == 1))
+        tp = np.sum((predicted == 1) & (y_test == 1))
+
+        precision = tp / (tp + fp + 1e-9)
+        recall = tp / (tp + fn + 1e-9)
+        f1 = 2 * precision * recall / (precision + recall + 1e-9)
+
+        print("\nTesting Accuracy :", round(accuracy, 2), "%")
+        print("Confusion Matrix :")
+        print("                 Predicted Low  Predicted High")
+        print(f"Actual Low          {tn:4d}             {fp:4d}")
+        print(f"Actual High         {fn:4d}             {tp:4d}")
+        print("Precision :", round(precision, 4))
+        print("Recall    :", round(recall, 4))
+        print("F1 Score  :", round(f1, 4))
+
+        print("\nSample Predictions")
+        print("No. | ANFIS Output | Predicted | Actual")
+        for i in range(min(8, len(X_test))):
+            pred_label = "High" if predicted[i] == 1 else "Low"
+            actual_label = "High" if y_test[i] == 1 else "Low"
+            print(f"{i+1:3d} | {test_output[i]:11.3f} | {pred_label:9s} | {actual_label}")
+
+    else:
+        predicted = np.clip(test_output, 0, 1) * (y_max - y_min) + y_min
+        mse = np.mean((y_test - predicted) ** 2)
+        rmse = np.sqrt(mse)
+        mae = np.mean(np.abs(y_test - predicted))
+        print("\nTest MSE  :", round(mse, 3))
+        print("Test RMSE :", round(rmse, 3))
+        print("Test MAE  :", round(mae, 3))
+
+        print("\nSample Predictions")
+        print("No. | Actual | Predicted")
+        for i in range(min(8, len(X_test))):
+            print(f"{i+1:3d} | {y_test[i]:7.2f} | {predicted[i]:9.2f}")
+
+    # Training error graph
+    plt.figure(figsize=(7, 4))
+    plt.plot(range(1, epochs + 1), loss_history)
+    plt.title(title + " - Training Error")
+    plt.xlabel("Epoch")
+    plt.ylabel("Mean Squared Error")
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+    print("\nANFIS execution completed.")
+
+train_anfis(X, y, feature_names, "ANFIS - Stock Price Prediction")

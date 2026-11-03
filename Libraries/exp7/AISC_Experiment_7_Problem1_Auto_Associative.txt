@@ -1,0 +1,49 @@
+# EXPERIMENT 7 - PROBLEM 1
+# AUTO ASSOCIATIVE MEMORY USING HEBBIAN LEARNING
+
+import numpy as np
+
+# Stored bipolar training pattern
+stored = np.array([-1, 1, 1, 1])
+
+# Hebbian learning: W = s transpose multiplied by s
+W = np.outer(stored, stored)
+
+print("STORED PATTERN:", stored)
+print("WEIGHT MATRIX W:")
+print(W)
+
+# Bipolar activation: +1 for positive net, -1 otherwise
+def bipolar_step(net):
+    return np.where(net > 0, 1, -1)
+
+# Recall a pattern using the stored weight matrix
+def recall(vector, label):
+    vector = np.array(vector)
+    net = vector @ W
+    output = bipolar_step(net)
+
+    if np.array_equal(output, stored):
+        status = "RECOGNISED"
+    else:
+        status = "NOT RECOGNISED"
+
+    print("\n[", label, "]")
+    print("Input      :", vector)
+    print("Net Input  :", net)
+    print("Output     :", output, "->", status)
+
+    return output
+
+# Test patterns: same, missing and incorrect components
+test_cases = [
+    ("Same input", [-1, 1, 1, 1]),
+    ("One missing (x1)", [0, 1, 1, 1]),
+    ("One missing (x3)", [-1, 1, 0, 1]),
+    ("One mistake (x2)", [-1, -1, 1, 1]),
+    ("Two missing (x1,x2)", [0, 0, 1, 1]),
+    ("Two mistakes (x2,x3)", [-1, -1, -1, 1])
+]
+
+for label, vector in test_cases:
+    recall(vector, label)

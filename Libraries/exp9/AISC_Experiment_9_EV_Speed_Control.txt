@@ -1,0 +1,132 @@
+# PROGRAM 3 - FUZZY CONTROLLER FOR SPEED CONTROL IN ELECTRIC VEHICLES
+# Follows the EV controller in the supplied AISC Experiment 9 PDF.
+
+import numpy as np
+import skfuzzy as fuzz
+from skfuzzy import control as ctrl
+import matplotlib.pyplot as plt
+
+print('Libraries imported successfully!')
+
+# 1. DEFINE INPUT AND OUTPUT VARIABLES
+speed_error = ctrl.Antecedent(np.arange(-50, 51, 1), 'speed_error')
+acceleration = ctrl.Antecedent(np.arange(-10, 11, 1), 'acceleration')
+motorPower = ctrl.Consequent(np.arange(0, 101, 1), 'motorPower')
+
+# 2. SPEED ERROR MEMBERSHIP FUNCTIONS
+speed_error['Negative'] = fuzz.trimf(speed_error.universe, [-50, -50, 0])
+speed_error['Zero'] = fuzz.trimf(speed_error.universe, [-25, 0, 25])
+speed_error['Positive'] = fuzz.trimf(speed_error.universe, [0, 50, 50])
+
+# 3. ACCELERATION MEMBERSHIP FUNCTIONS
+acceleration['Negative'] = fuzz.trimf(acceleration.universe, [-10, -10, 0])
+acceleration['Zero'] = fuzz.trimf(acceleration.universe, [-5, 0, 5])
+acceleration['Positive'] = fuzz.trimf(acceleration.universe, [0, 10, 10])
+
+# 4. MOTOR POWER MEMBERSHIP FUNCTIONS
+motorPower['Low'] = fuzz.trimf(motorPower.universe, [0, 0, 50])
+motorPower['Medium'] = fuzz.trimf(motorPower.universe, [25, 50, 75])
+motorPower['High'] = fuzz.trimf(motorPower.universe, [50, 100, 100])
+
+# 5. PLOT MEMBERSHIP FUNCTIONS
+def plot_membership(variable, title, xlabel, x_limit, x_ticks):
+    plt.figure(figsize=(8, 4))
+    for name, membership in variable.terms.items():
+        plt.plot(variable.universe, membership.mf,
+                 linewidth=2, label=name)
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel('Membership Degree')
+    plt.xlim(x_limit)
+    plt.ylim(0, 1.05)
+    plt.xticks(x_ticks)
+    plt.grid(True)
+    plt.legend()
+    plt.show()
+
+plot_membership(speed_error, 'Membership Functions for Speed Error',
+                'Speed Error (km/h)', (-50, 50), np.arange(-50, 51, 10))
+plot_membership(acceleration, 'Membership Functions for Acceleration',
+                'Acceleration (m/s^2)', (-10, 10), np.arange(-10, 11, 2))
+plot_membership(motorPower, 'Membership Functions for Motor Power',
+                'Motor Power (%)', (0, 100), np.arange(0, 101, 10))
+
+# 6. DEFINE NINE FUZZY RULES
+rules = [
+    # Negative speed error
+    ctrl.Rule(speed_error['Negative'] & acceleration['Negative'], motorPower['Low']),
+    ctrl.Rule(speed_error['Negative'] & acceleration['Zero'], motorPower['Low']),
+    ctrl.Rule(speed_error['Negative'] & acceleration['Positive'], motorPower['Low']),
+
+    # Zero speed error
+    ctrl.Rule(speed_error['Zero'] & acceleration['Negative'], motorPower['Medium']),
+    ctrl.Rule(speed_error['Zero'] & acceleration['Zero'], motorPower['Medium']),
+    ctrl.Rule(speed_error['Zero'] & acceleration['Positive'], motorPower['Low']),
+
+    # Positive speed error
+    ctrl.Rule(speed_error['Positive'] & acceleration['Negative'], motorPower['High']),
+    ctrl.Rule(speed_error['Positive'] & acceleration['Zero'], motorPower['High']),
+    ctrl.Rule(speed_error['Positive'] & acceleration['Positive'], motorPower['Medium'])
+]
+
+# 7. CREATE FUZZY CONTROL SYSTEM
+speed_control = ctrl.ControlSystem(rules)
+simulation = ctrl.ControlSystemSimulation(speed_control)
+
+# 8. INPUT VALUES (change these values to test other cases)
+desired_speed = 80
+actual_speed = 60
+vehicle_acceleration = 1
+
+error = desired_speed - actual_speed
+
+simulation.input['speed_error'] = error
+simulation.input['acceleration'] = vehicle_acceleration
+
+# 9. COMPUTE FUZZY OUTPUT
+simulation.compute()
+result = simulation.output['motorPower']
+
+# 10. DISPLAY RESULTS
+print('\nELECTRIC VEHICLE SPEED CONTROL')
+print('Desired Speed:', desired_speed, 'km/h')
+print('Actual Speed:', actual_speed, 'km/h')
+print('Speed Error:', error, 'km/h')
+print('Acceleration:', vehicle_acceleration, 'm/s^2')
+print('Calculated Motor Power:', round(result, 2), '%')
+
+# 11. DISPLAY FUZZIFICATION VALUES
+error_negative = fuzz.interp_membership(
+    speed_error.universe, speed_error['Negative'].mf, error)
+error_zero = fuzz.interp_membership(
+    speed_error.universe, speed_error['Zero'].mf, error)
+error_positive = fuzz.interp_membership(
+    speed_error.universe, speed_error['Positive'].mf, error)
+
+acc_negative = fuzz.interp_membership(
+    acceleration.universe, acceleration['Negative'].mf, vehicle_acceleration)
+acc_zero = fuzz.interp_membership(
+    acceleration.universe, acceleration['Zero'].mf, vehicle_acceleration)
+acc_positive = fuzz.interp_membership(
+    acceleration.universe, acceleration['Positive'].mf, vehicle_acceleration)
+
+print('\nFUZZIFICATION RESULTS')
+print('Speed Error - Negative:', round(error_negative, 3))
+print('Speed Error - Zero:', round(error_zero, 3))
+print('Speed Error - Positive:', round(error_positive, 3))
+print('Acceleration - Negative:', round(acc_negative, 3))
+print('Acceleration - Zero:', round(acc_zero, 3))
+print('Acceleration - Positive:', round(acc_positive, 3))
+
+# 12. FINAL MOTOR POWER GRAPH
+motorPower.view(sim=simulation)
+plt.axvline(result, color='red', linestyle='--', linewidth=2,
+            label=f'Motor Power = {result:.2f}%')
+plt.title('Final Motor Power Output')
+plt.xlabel('Motor Power (%)')
+plt.ylabel('Membership Degree')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+print('\nEV Speed Controller Executed Successfully!')

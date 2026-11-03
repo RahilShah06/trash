@@ -1,0 +1,151 @@
+# AISC EXPERIMENT 9 - TRAIN BRAKE POWER FUZZY CONTROLLER
+# Based on the separate worked train-braking case-study PDF.
+# NumPy-only implementation of fuzzification, rule evaluation,
+# max-min aggregation, centroid defuzzification, and notebook midpoint method.
+
+import numpy as np
+
+
+def ramp_membership(value, a, b):
+    """Linear rise from 0 at a to 1 at b."""
+    if value <= a:
+        return 0.0
+    if value >= b:
+        return 1.0
+    return (value - a) / (b - a)
+
+
+def fall_membership(value, a, b):
+    """Linear fall from 1 at a to 0 at b."""
+    if value <= a:
+        return 1.0
+    if value >= b:
+        return 0.0
+    return (b - value) / (b - a)
+
+
+def distance_memberships(x):
+    return {
+        'VSD': fall_membership(x, 0, 100) if 0 <= x <= 100 else 0.0,
+        'SD': (x / 100 if 0 <= x <= 100 else
+               (400 - x) / 300 if 100 <= x <= 400 else 0.0),
+        'LD': ((x - 100) / 300 if 100 <= x <= 400 else
+               (500 - x) / 100 if 400 <= x <= 500 else 0.0),
+        'VLD': ramp_membership(x, 400, 500) if 400 <= x <= 500 else 0.0
+    }
+
+
+def speed_memberships(y):
+    return {
+        'VLS': fall_membership(y, 0, 10) if 0 <= y <= 10 else 0.0,
+        'LS': (y / 10 if 0 <= y <= 10 else
+               (50 - y) / 40 if 10 <= y <= 50 else 0.0),
+        'HS': ((y - 10) / 40 if 10 <= y <= 50 else
+               (60 - y) / 10 if 50 < y <= 60 else 0.0),
+        'VHS': ramp_membership(y, 50, 60) if 50 <= y <= 60 else 0.0
+    }
+
+
+def output_memberships(z):
+    """Output membership functions exactly as listed in the reference notes."""
+    return {
+        'VLP': fall_membership(z, 0, 20) if 0 <= z <= 20 else 0.0,
+        'LP': (z / 20 if 0 <= z <= 20 else
+               (80 - z) / 60 if 20 <= z <= 80 else 0.0),
+        'HP': ((z - 20) / 60 if 20 <= z <= 80 else
+               (100 - z) / 20 if 80 < z <= 100 else 0.0),
+        'VHP': ramp_membership(z, 80, 100) if 80 <= z <= 100 else 0.0
+    }
+
+
+# Input from the worked case study
+speed = 52       # km/h
+distance = 110   # metres
+
+mu_speed = speed_memberships(speed)
+mu_distance = distance_memberships(distance)
+
+print("TRAIN BRAKE POWER CONTROLLER")
+print("Speed:", speed, "km/h")
+print("Distance from stopping point:", distance, "m")
+
+print("\nSPEED MEMBERSHIPS")
+for name, value in mu_speed.items():
+    print(name, ":", round(value, 4))
+
+print("\nDISTANCE MEMBERSHIPS")
+for name, value in mu_distance.items():
+    print(name, ":", round(value, 4))
+
+# Rule table: rows are distance terms; columns are speed terms
+rule_table = {
+    'VSD': {'VLS': 'HP',  'LS': 'HP',  'HS': 'VHP', 'VHS': 'VHP'},
+    'SD':  {'VLS': 'LP',  'LS': 'LP',  'HS': 'HP',  'VHS': 'VHP'},
+    'LD':  {'VLS': 'VLP', 'LS': 'VLP', 'HS': 'LP',  'VHS': 'HP'},
+    'VLD': {'VLS': 'VLP', 'LS': 'VLP', 'HS': 'LP',  'VHS': 'LP'}
+}
+
+# Rule evaluation: AND = min. Same output sets are combined by max.
+strengths = {'VLP': 0.0, 'LP': 0.0, 'HP': 0.0, 'VHP': 0.0}
+print("\nRULE EVALUATION")
+for d_name in ['VSD', 'SD', 'LD', 'VLD']:
+    for s_name in ['VLS', 'LS', 'HS', 'VHS']:
+        firing = min(mu_distance[d_name], mu_speed[s_name])
+        consequent = rule_table[d_name][s_name]
+        if firing > 0:
+            print(d_name, "AND", s_name, "->", consequent,
+                  "strength =", round(firing, 4))
+        strengths[consequent] = max(strengths[consequent], firing)
+
+print("\nOUTPUT SET FIRING STRENGTHS")
+for name, value in strengths.items():
+    print(name, ":", round(value, 4))
+
+# Create aggregated Mamdani output over brake power 0..100
+z = np.arange(0, 100.01, 0.1)
+aggregate = np.zeros_like(z, dtype=float)
+
+for name, strength in strengths.items():
+    if name == 'VLP':
+        mf = np.where((z >= 0) & (z <= 20), (20 - z) / 20, 0.0)
+    elif name == 'LP':
+        mf = np.where(z <= 20, z / 20,
+             np.where(z <= 80, (80 - z) / 60, 0.0))
+    elif name == 'HP':
+        mf = np.where(z <= 80, (z - 20) / 60,
+             np.where(z <= 100, (100 - z) / 20, 0.0))
+    else:  # VHP
+        mf = np.where((z >= 80) & (z <= 100), (z - 80) / 20, 0.0)
+
+    mf = np.clip(mf, 0, 1)
+    aggregate = np.maximum(aggregate, np.minimum(mf, strength))
+
+# Centroid defuzzification (discrete numerical approximation)
+if np.sum(aggregate) == 0:
+    raise ValueError("No output rule was activated.")
+step = z[1] - z[0]
+area = np.sum((aggregate[:-1] + aggregate[1:]) * step / 2)
+moment = np.sum((z[:-1] * aggregate[:-1] +
+                 z[1:] * aggregate[1:]) * step / 2)
+centroid = moment / area
+
+print("\nFULL AGGREGATED CENTROID OUTPUT")
+print("Brake Power:", round(centroid, 2), "%")
+
+# Notebook method: use the dominant HP rule level only
+# For HP rising edge: (z - 20)/60 = 0.8 -> z = 68
+# For HP falling edge: (100 - z)/20 = 0.8 -> z = 84
+hp_strength = strengths['HP']
+if hp_strength > 0:
+    left = 20 + 60 * hp_strength
+    right = 100 - 20 * hp_strength
+    midpoint = (left + right) / 2
+
+    print("\nNOTEBOOK DOMINANT-HP MIDPOINT METHOD")
+    print("HP firing strength:", round(hp_strength, 4))
+    print("Left intersection:", round(left, 2), "%")
+    print("Right intersection:", round(right, 2), "%")
+    print("Brake Power:", round(midpoint, 2), "%")
+
+print("\nInterpretation: a larger brake-power percentage means stronger braking.")
+print("This is an educational fuzzy-controller example, not a safety-certified train controller.")

@@ -1,0 +1,106 @@
+# PROGRAM 1 - FUZZY CONTROLLER FOR ROOM TEMPERATURE REGULATION
+
+import numpy as np
+import skfuzzy as fuzz
+from skfuzzy import control as ctrl
+import matplotlib.pyplot as plt
+
+# 1. DEFINE INPUT AND OUTPUT VARIABLES
+# Temperature: degrees Celsius, range 0 to 50
+# Humidity: custom scale 0 to 24, preserved from the supplied snippet
+# Fan speed: 0 to 1600 RPM
+
+temperature = ctrl.Antecedent(np.arange(0, 51, 1), 'temperature')
+humidity = ctrl.Antecedent(np.arange(0, 25, 1), 'humidity')
+fanSpeed = ctrl.Consequent(np.arange(0, 1601, 1), 'fanSpeed')
+
+# 2. TEMPERATURE MEMBERSHIP FUNCTIONS
+# The sets overlap slightly to avoid uncovered boundary values.
+temperature['TooCold'] = fuzz.trimf(temperature.universe, [0, 0, 10])
+temperature['Cold'] = fuzz.trimf(temperature.universe, [5, 10, 20])
+temperature['Warm'] = fuzz.trimf(temperature.universe, [15, 21, 28])
+temperature['Hot'] = fuzz.trimf(temperature.universe, [24, 31, 38])
+# Right-shoulder set: keeps the high end of the 0-50 range covered.
+temperature['TooHot'] = fuzz.trapmf(temperature.universe, [35, 40, 50, 50])
+
+# 3. HUMIDITY MEMBERSHIP FUNCTIONS
+# The supplied code uses a 0-24 humidity scale.
+humidity['Dry'] = fuzz.trimf(humidity.universe, [0, 0, 8])
+humidity['Normal'] = fuzz.trimf(humidity.universe, [5, 12, 19])
+humidity['Humid'] = fuzz.trimf(humidity.universe, [15, 24, 24])
+
+# 4. FAN SPEED MEMBERSHIP FUNCTIONS
+# fanSpeed is an output, so it is defined as a Consequent.
+fanSpeed['VeryLow'] = fuzz.trimf(fanSpeed.universe, [0, 0, 400])
+fanSpeed['Low'] = fuzz.trimf(fanSpeed.universe, [250, 500, 800])
+fanSpeed['Medium'] = fuzz.trimf(fanSpeed.universe, [650, 900, 1150])
+fanSpeed['High'] = fuzz.trimf(fanSpeed.universe, [1000, 1300, 1500])
+fanSpeed['VeryHigh'] = fuzz.trapmf(fanSpeed.universe, [1350, 1500, 1600, 1600])
+
+# 5. DISPLAY MEMBERSHIP FUNCTIONS
+temperature.view()
+humidity.view()
+fanSpeed.view()
+plt.show()
+
+# 6. DEFINE FUZZY RULES
+rules = [
+    # Too cold: keep fan speed very low
+    ctrl.Rule(temperature['TooCold'] & humidity['Dry'], fanSpeed['VeryLow']),
+    ctrl.Rule(temperature['TooCold'] & humidity['Normal'], fanSpeed['VeryLow']),
+    ctrl.Rule(temperature['TooCold'] & humidity['Humid'], fanSpeed['VeryLow']),
+
+    # Cold
+    ctrl.Rule(temperature['Cold'] & humidity['Dry'], fanSpeed['Low']),
+    ctrl.Rule(temperature['Cold'] & humidity['Normal'], fanSpeed['Low']),
+    ctrl.Rule(temperature['Cold'] & humidity['Humid'], fanSpeed['Medium']),
+
+    # Warm
+    ctrl.Rule(temperature['Warm'] & humidity['Dry'], fanSpeed['Low']),
+    ctrl.Rule(temperature['Warm'] & humidity['Normal'], fanSpeed['Medium']),
+    ctrl.Rule(temperature['Warm'] & humidity['Humid'], fanSpeed['High']),
+
+    # Hot
+    ctrl.Rule(temperature['Hot'] & humidity['Dry'], fanSpeed['Medium']),
+    ctrl.Rule(temperature['Hot'] & humidity['Normal'], fanSpeed['High']),
+    ctrl.Rule(temperature['Hot'] & humidity['Humid'], fanSpeed['VeryHigh']),
+
+    # Too hot
+    ctrl.Rule(temperature['TooHot'] & humidity['Dry'], fanSpeed['VeryHigh']),
+    ctrl.Rule(temperature['TooHot'] & humidity['Normal'], fanSpeed['VeryHigh']),
+    ctrl.Rule(temperature['TooHot'] & humidity['Humid'], fanSpeed['VeryHigh'])
+]
+
+# 7. CREATE FUZZY CONTROL SYSTEM
+room_control = ctrl.ControlSystem(rules)
+simulation = ctrl.ControlSystemSimulation(room_control)
+
+# 8. GIVE INPUT VALUES (change these values to test other cases)
+room_temperature = 32
+room_humidity = 16
+
+simulation.input['temperature'] = room_temperature
+simulation.input['humidity'] = room_humidity
+
+# 9. COMPUTE FUZZY OUTPUT
+simulation.compute()
+result = simulation.output['fanSpeed']
+
+# 10. DISPLAY RESULT
+print('\nROOM TEMPERATURE REGULATION')
+print('Temperature:', room_temperature, 'degree C')
+print('Humidity:', room_humidity, '(custom 0-24 scale)')
+print('Required Fan Speed:', round(result, 2), 'RPM')
+
+# 11. DISPLAY OUTPUT GRAPH
+fanSpeed.view(sim=simulation)
+plt.axvline(result, color='red', linestyle='--',
+            label=f'Fan Speed = {result:.2f} RPM')
+plt.title('Room Temperature Controller - Fan Speed')
+plt.xlabel('Fan Speed (RPM)')
+plt.ylabel('Membership Degree')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+print('\nTemperature Controller Executed Successfully!')

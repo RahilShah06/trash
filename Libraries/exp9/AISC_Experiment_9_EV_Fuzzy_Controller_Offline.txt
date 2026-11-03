@@ -1,0 +1,139 @@
+# AISC EXPERIMENT 9 - EV FUZZY CONTROLLER (NUMPY-ONLY VERSION)
+# This version follows the same membership functions and nine rules as the PDF.
+# It does not require scikit-fuzzy. It uses discrete Mamdani inference and centroid.
+
+import numpy as np
+
+
+def trimf(x, a, b, c):
+    """Triangular/shoulder membership function."""
+    x = np.asarray(x, dtype=float)
+    y = np.zeros_like(x)
+
+    if a == b:
+        y[x == a] = 1.0
+    else:
+        mask = (x >= a) & (x <= b)
+        y[mask] = (x[mask] - a) / (b - a)
+
+    if b == c:
+        y[x == c] = 1.0
+    else:
+        mask = (x >= b) & (x <= c)
+        y[mask] = (c - x[mask]) / (c - b)
+
+    return np.clip(y, 0, 1)
+
+
+def membership_value(value, points):
+    return float(trimf(np.array([value]), *points)[0])
+
+
+# Input/output universes
+error_universe = np.arange(-50, 51, 1)
+acc_universe = np.arange(-10, 11, 1)
+power_universe = np.arange(0, 100.01, 0.1)
+
+# Membership functions
+error_mf = {
+    'Negative': trimf(error_universe, -50, -50, 0),
+    'Zero': trimf(error_universe, -25, 0, 25),
+    'Positive': trimf(error_universe, 0, 50, 50)
+}
+
+acc_mf = {
+    'Negative': trimf(acc_universe, -10, -10, 0),
+    'Zero': trimf(acc_universe, -5, 0, 5),
+    'Positive': trimf(acc_universe, 0, 10, 10)
+}
+
+power_mf = {
+    'Low': trimf(power_universe, 0, 0, 50),
+    'Medium': trimf(power_universe, 25, 50, 75),
+    'High': trimf(power_universe, 50, 100, 100)
+}
+
+# Rule base from the PDF: (speed-error set, acceleration set, output set)
+rules = [
+    ('Negative', 'Negative', 'Low'),
+    ('Negative', 'Zero', 'Low'),
+    ('Negative', 'Positive', 'Low'),
+    ('Zero', 'Negative', 'Medium'),
+    ('Zero', 'Zero', 'Medium'),
+    ('Zero', 'Positive', 'Low'),
+    ('Positive', 'Negative', 'High'),
+    ('Positive', 'Zero', 'High'),
+    ('Positive', 'Positive', 'Medium')
+]
+
+# Given values from the PDF
+desired_speed = 80
+actual_speed = 60
+vehicle_acceleration = 1
+error = desired_speed - actual_speed
+
+# Fuzzification
+error_degree = {
+    name: membership_value(error, points)
+    for name, points in {
+        'Negative': (-50, -50, 0),
+        'Zero': (-25, 0, 25),
+        'Positive': (0, 50, 50)
+    }.items()
+}
+
+acc_degree = {
+    name: membership_value(vehicle_acceleration, points)
+    for name, points in {
+        'Negative': (-10, -10, 0),
+        'Zero': (-5, 0, 5),
+        'Positive': (0, 10, 10)
+    }.items()
+}
+
+print("ELECTRIC VEHICLE SPEED CONTROL")
+print("Desired speed:", desired_speed, "km/h")
+print("Actual speed:", actual_speed, "km/h")
+print("Speed error:", error, "km/h")
+print("Acceleration:", vehicle_acceleration, "m/s^2")
+
+print("\nFUZZIFICATION - SPEED ERROR")
+for name, value in error_degree.items():
+    print(name, ":", round(value, 4))
+
+print("\nFUZZIFICATION - ACCELERATION")
+for name, value in acc_degree.items():
+    print(name, ":", round(value, 4))
+
+# Rule evaluation using min for AND; combine same consequent using max
+output_strength = {'Low': 0.0, 'Medium': 0.0, 'High': 0.0}
+print("\nRULE EVALUATION")
+for e_set, a_set, out_set in rules:
+    strength = min(error_degree[e_set], acc_degree[a_set])
+    if strength > 0:
+        print(e_set, "AND", a_set, "->", out_set,
+              "firing strength =", round(strength, 4))
+    output_strength[out_set] = max(output_strength[out_set], strength)
+
+print("\nOUTPUT ACTIVATION STRENGTHS")
+for name, value in output_strength.items():
+    print(name, ":", round(value, 4))
+
+# Mamdani clipping and max aggregation
+aggregated = np.zeros_like(power_universe, dtype=float)
+for name, strength in output_strength.items():
+    clipped = np.minimum(power_mf[name], strength)
+    aggregated = np.maximum(aggregated, clipped)
+
+# Discrete centroid defuzzification
+if np.sum(aggregated) == 0:
+    raise ValueError("No rule fired; output cannot be defuzzified.")
+
+step = power_universe[1] - power_universe[0]
+area = np.sum((aggregated[:-1] + aggregated[1:]) * step / 2)
+moment = np.sum((power_universe[:-1] * aggregated[:-1] +
+                 power_universe[1:] * aggregated[1:]) * step / 2)
+motor_power = moment / area
+
+print("\nCalculated Motor Power:", round(motor_power, 2), "%")
+print("Note: This is a NumPy-only discrete centroid approximation.")

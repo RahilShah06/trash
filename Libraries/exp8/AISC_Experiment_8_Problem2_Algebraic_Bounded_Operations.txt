@@ -1,0 +1,15 @@
+# EXPERIMENT 8 - PROBLEM 2
+# ALGEBRAIC AND BOUNDED FUZZY OPERATIONS
+
+import numpy as np
+
+A = np.array([0.2, 0.3, 0.4, 0.5])
+B = np.array([0.1, 0.2, 0.2, 1.0])
+
+print("Set A:", A)
+print("Set B:", B)
+
+print("\nAlgebraic Sum:", A + B - (A * B))
+print("Algebraic Product:", A * B)
+print("Bounded Sum:", np.minimum(1.0, A + B))
+print("Bounded Difference:", np.maximum(0, A - B))

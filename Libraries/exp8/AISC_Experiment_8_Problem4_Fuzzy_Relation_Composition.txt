@@ -1,0 +1,45 @@
+# EXPERIMENT 8 - PROBLEM 4
+# MAX-MIN AND MAX-PRODUCT COMPOSITION
+
+import numpy as np
+
+R = np.array([
+    [0.6, 0.3],
+    [0.2, 0.9]
+])
+
+S = np.array([
+    [1.0, 0.5, 0.3],
+    [0.8, 0.4, 0.7]
+])
+
+T1 = np.zeros((2, 3))
+T2 = np.zeros((2, 3))
+
+# Max-Min Composition
+for i in range(2):
+    for j in range(3):
+        T1[i, j] = max(
+            min(R[i, 0], S[0, j]),
+            min(R[i, 1], S[1, j])
+        )
+
+# Max-Product Composition
+for i in range(2):
+    for j in range(3):
+        T2[i, j] = max(
+            R[i, 0] * S[0, j],
+            R[i, 1] * S[1, j]
+        )
+
+print("Relation R:")
+print(R)
+
+print("\nRelation S:")
+print(S)
+
+print("\nMax-Min Composition:")
+print(T1)
+
+print("\nMax-Product Composition:")
+print(T2)

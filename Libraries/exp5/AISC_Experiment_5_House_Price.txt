@@ -1,0 +1,174 @@
+# CASE STUDY: HOUSE PRICE PREDICTION USING BACKPROPAGATION
+# 3 INPUTS -> 8 HIDDEN NEURONS -> 1 OUTPUT
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Generate dummy house data
+np.random.seed(42)
+N = 100
+
+size_sqft = np.random.randint(500, 2501, N)
+rooms = np.random.randint(1, 6, N)
+location_value = np.random.randint(1, 11, N)
+
+price_lakhs = (5 + 0.010 * size_sqft + 2.0 * rooms + 0.9 * location_value)
+price_lakhs = np.clip(price_lakhs, 5, 50)
+
+data = pd.DataFrame({
+    "Size_sqft": size_sqft,
+    "Rooms": rooms,
+    "Location_Value": location_value,
+    "Actual_Price_Lakhs": price_lakhs
+})
+
+# Prepare input and target arrays
+X = data[["Size_sqft", "Rooms", "Location_Value"]].values.astype(float)
+y = data[["Actual_Price_Lakhs"]].values.astype(float)
+
+# Standardize input features
+X_mean = X.mean(axis=0)
+X_std = X.std(axis=0)
+X_scaled = (X - X_mean) / X_std
+
+# Scale target values between 0 and 1
+y_min = float(y.min())
+y_max = float(y.max())
+y_range = y_max - y_min
+y_scaled = (y - y_min) / y_range
+
+# Neural network structure and settings
+input_neurons = 3
+hidden_neurons = 8
+learning_rate = 0.20
+momentum = 0.50
+iterations = 10
+
+# Initialize weights and biases
+rng = np.random.default_rng(109)
+W1 = rng.normal(0, 0.25, size=(input_neurons, hidden_neurons))
+b1 = np.zeros((1, hidden_neurons))
+W2 = rng.normal(0, 0.25, size=(hidden_neurons, 1))
+b2 = np.zeros((1, 1))
+
+# Initialize momentum terms
+V_W1 = np.zeros_like(W1)
+V_b1 = np.zeros_like(b1)
+V_W2 = np.zeros_like(W2)
+V_b2 = np.zeros_like(b2)
+
+# Hidden-layer activation function
+def tanh(x):
+    return np.tanh(x)
+
+# Derivative of tanh when activated output is already known
+def tanh_derivative(a):
+    return 1 - a ** 2
+
+history = []
+
+# Training loop
+for epoch in range(1, iterations + 1):
+
+    # Forward propagation
+    Z1 = X_scaled @ W1 + b1
+    A1 = tanh(Z1)
+    y_pred_scaled = A1 @ W2 + b2
+    y_pred = (y_pred_scaled * y_range) + y_min
+
+    # Calculate performance metrics before this epoch's update
+    error = y_pred - y
+    mse = np.mean(error ** 2)
+    rmse = np.sqrt(mse)
+    mae = np.mean(np.abs(error))
+    mape = np.mean(np.abs(error / y)) * 100
+
+    history.append([epoch, mse, rmse, mae, mape])
+
+    # Backpropagation: output layer gradient
+    dY = 2 * (y_pred_scaled - y_scaled) / N
+    dW2 = A1.T @ dY
+    db2 = np.sum(dY, axis=0, keepdims=True)
+
+    # Backpropagation: hidden layer gradient
+    dA1 = dY @ W2.T
+    dZ1 = dA1 * tanh_derivative(A1)
+    dW1 = X_scaled.T @ dZ1
+    db1 = np.sum(dZ1, axis=0, keepdims=True)
+
+    # Momentum-based weight updates
+    V_W2 = momentum * V_W2 - learning_rate * dW2
+    V_b2 = momentum * V_b2 - learning_rate * db2
+    V_W1 = momentum * V_W1 - learning_rate * dW1
+    V_b1 = momentum * V_b1 - learning_rate * db1
+
+    W2 = W2 + V_W2
+    b2 = b2 + V_b2
+    W1 = W1 + V_W1
+    b1 = b1 + V_b1
+
+# Forward propagation again using final updated weights
+Z1 = X_scaled @ W1 + b1
+A1 = tanh(Z1)
+y_pred_scaled = A1 @ W2 + b2
+y_pred = (y_pred_scaled * y_range) + y_min
+
+# Final error metrics
+final_error = y_pred - y
+final_mse = np.mean(final_error ** 2)
+final_rmse = np.sqrt(final_mse)
+final_mae = np.mean(np.abs(final_error))
+final_mape = np.mean(np.abs(final_error / y)) * 100
+
+# Display iteration results
+results = pd.DataFrame(
+    history,
+    columns=["Iteration", "MSE", "RMSE_Lakhs", "MAE_Lakhs", "MAPE_Percent"]
+)
+
+print("\n" + "=" * 90)
+print("HOUSE PRICE BACKPROPAGATION - 10 ITERATIONS")
+print("=" * 90)
+print(results.round(6).to_string(index=False))
+
+print("\n" + "=" * 90)
+print("FINAL ERROR AFTER 10 ITERATIONS")
+print("=" * 90)
+print(f"Final MSE  : {final_mse:.10f}")
+print(f"Final RMSE : {final_rmse:.10f} lakhs")
+print(f"Final MAE  : {final_mae:.10f} lakhs")
+print(f"Final MAPE : {final_mape:.10f}%")
+
+# Create prediction table
+prediction_df = data.copy()
+prediction_df["Predicted_Price_Lakhs"] = y_pred.flatten()
+prediction_df["Absolute_Error_Lakhs"] = np.abs(final_error.flatten())
+prediction_df["Percentage_Error"] = np.abs(final_error.flatten() / y.flatten()) * 100
+
+prediction_df.to_csv("case_study_3_final_predictions.csv", index=False)
+print("\nPredictions saved to case_study_3_final_predictions.csv")
+
+# Plot MSE across iterations
+plt.figure(figsize=(10, 6))
+plt.plot(results["Iteration"], results["MSE"], marker="o", linewidth=2)
+plt.xlabel("Backpropagation Iteration")
+plt.ylabel("Mean Squared Error")
+plt.title("MSE Reduction Over 10 Backpropagation Iterations")
+plt.xticks(range(1, 11))
+plt.grid(True, alpha=0.3)
+plt.tight_layout()
+plt.show()
+
+# Plot actual and predicted house prices
+plot_data = prediction_df.sort_values("Actual_Price_Lakhs")
+plt.figure(figsize=(10, 6))
+plt.plot(plot_data["Actual_Price_Lakhs"].values, label="Actual Price", marker="o", markersize=3)
+plt.plot(plot_data["Predicted_Price_Lakhs"].values, label="Predicted Price", marker="x", markersize=3)
+plt.xlabel("House (sorted by actual price)")
+plt.ylabel("Price (Lakhs)")
+plt.title("Actual vs Predicted House Prices")
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.tight_layout()
+plt.show()
